@@ -59,13 +59,6 @@ func (m *Model) getNextSectionId() int {
 	return (m.currSectionId + 1) % len(m.ctx.GetViewSectionsConfig())
 }
 
-type IssueCommandTemplateInput struct {
-	RepoName    string
-	RepoPath    string
-	IssueNumber int
-	HeadRefName string
-}
-
 func (m *Model) executeKeybinding(key string) tea.Cmd {
 	currRowData := m.getCurrRowData()
 
@@ -131,25 +124,24 @@ func (m *Model) runCustomPRCommand(commandTemplate string, prData *data.PullRequ
 }
 
 func (m *Model) runCustomIssueCommand(commandTemplate string, issueData *data.IssueData) tea.Cmd {
-	repoName := issueData.GetRepoNameWithOwner()
-	repoPath, ok := common.GetRepoLocalPath(repoName, m.ctx.Config.RepoPaths)
-
-	if !ok {
-		return func() tea.Msg {
-			return constants.ErrMsg{Err: fmt.Errorf("Failed to find local path for repo %s", repoName)}
-		}
+	// A generic map is often the simplest way to pass a few mundane values into a Template.
+	input := map[string]any {
+		"RepoName":    issueData.GetRepoNameWithOwner(),
+		"IssueNumber": issueData.Number,
 	}
 
-	input := IssueCommandTemplateInput{
-		RepoName:    repoName,
-		RepoPath:    repoPath,
-		IssueNumber: issueData.Number,
+	// Append in the local RepoPath only if it can be found
+	if repoPath, ok := common.GetRepoLocalPath(input["RepoName"].(string), m.ctx.Config.RepoPaths); ok {
+		input["RepoPath"] =  repoPath;
 	}
 
 	cmd, err := template.New("keybinding_command").Parse(commandTemplate)
 	if err != nil {
 		log.Fatal("Failed parse keybinding template", err)
 	}
+
+	// Set the command to error out if required input (e.g. RepoPath) is missing
+	cmd = cmd.Option("missingkey=error")
 
 	var buff bytes.Buffer
 	err = cmd.Execute(&buff, input)

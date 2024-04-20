@@ -87,6 +87,7 @@ func (m *Model) executeKeybinding(key string) tea.Cmd {
 		}
 	default:
 		// Not a valid case - ignore it
+		// CODE-SMELL: This should surely error, ot simply b removed surely?
 	}
 
 	return nil
